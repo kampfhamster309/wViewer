@@ -142,11 +142,15 @@ body {
   text-align: left;
   font-weight: 600;
   border-bottom: 1px solid #e94560;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
 }
 
-#data-table th:hover {
+#data-table th.sortable {
+  cursor: pointer;
+}
+
+#data-table th.sortable:hover {
   color: #e94560;
 }
 

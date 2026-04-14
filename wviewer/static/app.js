@@ -139,22 +139,22 @@ const tableState = {
 };
 
 const TABLE_COLUMNS = [
-  { key: 'id',              label: 'ID' },
-  { key: 'mac',             label: 'MAC' },
-  { key: 'ssid',            label: 'SSID' },
-  { key: 'auth_mode',       label: 'Auth Mode' },
-  { key: 'first_seen',      label: 'First Seen' },
-  { key: 'channel',         label: 'Channel' },
-  { key: 'frequency',       label: 'Freq (MHz)' },
-  { key: 'rssi',            label: 'RSSI (dBm)' },
-  { key: 'latitude',        label: 'Latitude' },
-  { key: 'longitude',       label: 'Longitude' },
-  { key: 'altitude_meters', label: 'Alt (m)' },
-  { key: 'accuracy_meters', label: 'Acc (m)' },
-  { key: 'type',            label: 'Type' },
-  { key: 'import_id',       label: 'Import ID' },
-  { key: 'rcois',           label: 'RCOIs' },
-  { key: 'mfgr_id',         label: 'Mfgr ID' },
+  { key: 'id',              label: 'ID',          sortable: true  },
+  { key: 'mac',             label: 'MAC',         sortable: true  },
+  { key: 'ssid',            label: 'SSID',        sortable: true  },
+  { key: 'auth_mode',       label: 'Auth Mode',   sortable: true  },
+  { key: 'first_seen',      label: 'First Seen',  sortable: true  },
+  { key: 'channel',         label: 'Channel',     sortable: true  },
+  { key: 'frequency',       label: 'Freq (MHz)',  sortable: true  },
+  { key: 'rssi',            label: 'RSSI (dBm)',  sortable: true  },
+  { key: 'latitude',        label: 'Latitude',    sortable: true  },
+  { key: 'longitude',       label: 'Longitude',   sortable: true  },
+  { key: 'altitude_meters', label: 'Alt (m)',     sortable: true  },
+  { key: 'accuracy_meters', label: 'Acc (m)',     sortable: true  },
+  { key: 'type',            label: 'Type',        sortable: true  },
+  { key: 'import_id',       label: 'Import ID',   sortable: false },
+  { key: 'rcois',           label: 'RCOIs',       sortable: false },
+  { key: 'mfgr_id',         label: 'Mfgr ID',     sortable: false },
 ];
 
 // ===== Apply button =====
@@ -278,21 +278,55 @@ function renderTable(data) {
 
 function buildTableHead() {
   const thead = document.getElementById('table-head');
-  if (thead.querySelector('tr')) return; // already built
+  if (thead.querySelector('tr')) {
+    // Already built — just refresh the sort arrows
+    updateSortArrows();
+    return;
+  }
 
   const tr = document.createElement('tr');
   TABLE_COLUMNS.forEach(col => {
     const th = document.createElement('th');
     th.dataset.col = col.key;
-    th.textContent = col.label;
+
+    if (col.sortable) {
+      th.classList.add('sortable');
+      th.textContent = col.label;
+      const arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      th.appendChild(arrow);
+      th.addEventListener('click', () => {
+        if (tableState.sortBy === col.key) {
+          tableState.sortDir = tableState.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          tableState.sortBy  = col.key;
+          tableState.sortDir = 'asc';
+        }
+        tableState.page = 1;
+        fetchTablePage();
+      });
+    } else {
+      th.textContent = col.label;
+    }
+
     tr.appendChild(th);
   });
 
-  // Actions column header
-  const thAct = document.createElement('th');
-  tr.appendChild(thAct);
+  // Actions column header (no label, no sort)
+  tr.appendChild(document.createElement('th'));
 
   thead.appendChild(tr);
+  updateSortArrows();
+}
+
+function updateSortArrows() {
+  document.querySelectorAll('#table-head th[data-col]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (!arrow) return;
+    arrow.textContent = th.dataset.col === tableState.sortBy
+      ? (tableState.sortDir === 'asc' ? ' ↑' : ' ↓')
+      : '';
+  });
 }
 
 function buildTableRow(item) {
