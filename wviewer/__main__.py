@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import threading
 import time
 import webbrowser
@@ -7,27 +6,11 @@ import webbrowser
 import uvicorn
 
 
-async def _ensure_db() -> None:
-    """Create database tables if they do not exist yet.
-
-    In the development workflow users run ``alembic upgrade head`` instead.
-    For the installed .deb package this is the only schema-creation step,
-    so it runs automatically on every startup (create_all is idempotent).
-    """
-    from wviewer.db import Base, engine  # imported here to respect WVIEWER_DB env var
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="wViewer — WiGLE WiFi map viewer")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically")
     args = parser.parse_args()
-
-    # Ensure the database schema exists before the server starts
-    asyncio.run(_ensure_db())
 
     url = f"http://localhost:{args.port}"
     if not args.no_browser:

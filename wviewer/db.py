@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 
 def _db_path() -> Path:
@@ -20,7 +21,11 @@ def _db_path() -> Path:
 _DB_PATH = _db_path()
 DATABASE_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+# NullPool: no connection caching. Each request gets a fresh connection that
+# is closed immediately after use. This avoids stale-connection errors when
+# the engine is shared across asyncio event loops (e.g. __main__ setup vs
+# uvicorn's loop) and is perfectly fine for a single-user local SQLite app.
+engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

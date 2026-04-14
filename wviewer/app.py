@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -11,7 +12,23 @@ logger = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="wViewer", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Ensure the database schema exists before the first request is served.
+
+    Runs inside uvicorn's event loop, avoiding cross-loop issues with the
+    async engine. create_all is idempotent — safe to call on every startup.
+    """
+    from wviewer.db import Base, engine
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database schema ready.")
+    yield
+
+
+app = FastAPI(title="wViewer", version="0.1.0", lifespan=_lifespan)
 
 
 @app.exception_handler(Exception)
