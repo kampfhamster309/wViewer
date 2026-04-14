@@ -4,6 +4,33 @@
  * Map starts empty; results are only fetched when the user presses Apply.
  */
 
+// ===== View switching =====
+
+let currentView = 'map';
+
+function switchView(view) {
+  if (view === currentView) return;
+  currentView = view;
+
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+
+  // Show/hide panels
+  document.getElementById('map-view').classList.toggle('hidden', view !== 'map');
+  document.getElementById('table-view').classList.toggle('hidden', view !== 'table');
+
+  // Leaflet needs a size hint after being revealed
+  if (view === 'map') {
+    map.invalidateSize();
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
 // ===== Map setup =====
 
 const map = L.map('map', {
@@ -100,29 +127,71 @@ function toLocalDatetimeInput(date) {
   document.getElementById(id).addEventListener('input', saveFilters);
 });
 
+// ===== Table view state =====
+
+const tableState = {
+  page: 1,
+  pageSize: 50,
+  sortBy: 'id',
+  sortDir: 'asc',
+  totalPages: 1,
+  total: 0,
+};
+
+const TABLE_COLUMNS = [
+  { key: 'id',              label: 'ID' },
+  { key: 'mac',             label: 'MAC' },
+  { key: 'ssid',            label: 'SSID' },
+  { key: 'auth_mode',       label: 'Auth Mode' },
+  { key: 'first_seen',      label: 'First Seen' },
+  { key: 'channel',         label: 'Channel' },
+  { key: 'frequency',       label: 'Freq (MHz)' },
+  { key: 'rssi',            label: 'RSSI (dBm)' },
+  { key: 'latitude',        label: 'Latitude' },
+  { key: 'longitude',       label: 'Longitude' },
+  { key: 'altitude_meters', label: 'Alt (m)' },
+  { key: 'accuracy_meters', label: 'Acc (m)' },
+  { key: 'type',            label: 'Type' },
+  { key: 'import_id',       label: 'Import ID' },
+  { key: 'rcois',           label: 'RCOIs' },
+  { key: 'mfgr_id',         label: 'Mfgr ID' },
+];
+
 // ===== Apply button =====
 
 document.getElementById('btn-apply').addEventListener('click', applyFilters);
 
-async function applyFilters() {
+/** Build URLSearchParams from the current sidebar filter inputs. */
+function buildFilterParams() {
   const params = new URLSearchParams();
-
   const mac  = document.getElementById('filter-mac').value.trim();
   const ssid = document.getElementById('filter-ssid').value.trim();
   const auth = document.getElementById('filter-auth').value.trim();
   const type = document.getElementById('filter-type').value;
   const from = document.getElementById('filter-from').value;
   const to   = document.getElementById('filter-to').value;
-
   if (mac)  params.set('mac', mac);
   if (ssid) params.set('ssid', ssid);
   if (auth) params.set('auth_mode', auth);
   if (type) params.set('type', type);
   if (from) params.set('first_seen_from', from);
   if (to)   params.set('first_seen_to', to);
+  return params;
+}
+
+async function applyFilters() {
+  saveFilters();
+  if (currentView === 'map') {
+    await applyMapView();
+  } else {
+    await applyTableView();
+  }
+}
+
+async function applyMapView() {
+  const params = buildFilterParams();
   params.set('limit', '100000');
 
-  saveFilters();
   setFilterStatus('<span class="spinner"></span>Loading…', 'info');
 
   try {
@@ -135,6 +204,134 @@ async function applyFilters() {
   } catch (err) {
     setFilterStatus(`Error: ${err.message}`, 'err');
   }
+}
+
+async function applyTableView() {
+  tableState.page = 1;
+  await fetchTablePage();
+}
+
+async function fetchTablePage() {
+  const params = buildFilterParams();
+  params.set('page', tableState.page);
+  params.set('page_size', tableState.pageSize);
+  params.set('sort_by', tableState.sortBy);
+  params.set('sort_dir', tableState.sortDir);
+
+  setFilterStatus('<span class="spinner"></span>Loading…', 'info');
+
+  try {
+    const res = await fetch(`/api/networks/table?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderTable(data);
+    const t = data.total;
+    setFilterStatus(`${t} network${t !== 1 ? 's' : ''} found.`, 'ok');
+  } catch (err) {
+    setFilterStatus(`Error: ${err.message}`, 'err');
+  }
+}
+
+function renderTable(data) {
+  const { total, page, page_size, items } = data;
+
+  const start   = total === 0 ? 0 : (page - 1) * page_size + 1;
+  const end     = Math.min(page * page_size, total);
+  const totalPages = Math.max(1, Math.ceil(total / page_size));
+
+  tableState.totalPages = totalPages;
+  tableState.total      = total;
+
+  // Toolbar count
+  document.getElementById('table-count').textContent =
+    total === 0 ? 'No results' : `Showing ${start}–${end} of ${total}`;
+
+  // Header (built once; WVIEWER-20 will update sort arrows)
+  buildTableHead();
+
+  // Body
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  if (items.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = TABLE_COLUMNS.length + 1;
+    td.textContent = 'No networks match the current filters.';
+    td.style.cssText = 'text-align:center;color:#8892b0;padding:20px;';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  } else {
+    items.forEach(item => tbody.appendChild(buildTableRow(item)));
+  }
+
+  // Pagination controls
+  document.getElementById('pagination-info').textContent =
+    total === 0 ? '' : `${start}–${end} of ${total}`;
+  document.getElementById('page-indicator').textContent = `${page} / ${totalPages}`;
+
+  document.getElementById('btn-first-page').disabled = page <= 1;
+  document.getElementById('btn-prev-page').disabled  = page <= 1;
+  document.getElementById('btn-next-page').disabled  = page >= totalPages;
+  document.getElementById('btn-last-page').disabled  = page >= totalPages;
+}
+
+function buildTableHead() {
+  const thead = document.getElementById('table-head');
+  if (thead.querySelector('tr')) return; // already built
+
+  const tr = document.createElement('tr');
+  TABLE_COLUMNS.forEach(col => {
+    const th = document.createElement('th');
+    th.dataset.col = col.key;
+    th.textContent = col.label;
+    tr.appendChild(th);
+  });
+
+  // Actions column header
+  const thAct = document.createElement('th');
+  tr.appendChild(thAct);
+
+  thead.appendChild(tr);
+}
+
+function buildTableRow(item) {
+  const tr = document.createElement('tr');
+
+  TABLE_COLUMNS.forEach(col => {
+    const td = document.createElement('td');
+    const val = item[col.key];
+    if (val == null) {
+      td.textContent = '';
+    } else if (col.key === 'first_seen') {
+      // Drop sub-second precision, replace T separator
+      td.textContent = String(val).replace('T', ' ').replace(/\.\d+$/, '');
+    } else {
+      td.textContent = val;
+    }
+    if (val != null) td.title = String(val);
+    tr.appendChild(td);
+  });
+
+  // "Show on map" button
+  const tdAct = document.createElement('td');
+  const btn   = document.createElement('button');
+  btn.className   = 'btn-show-map';
+  btn.textContent = 'Map';
+  btn.title       = 'Show this network on the map';
+  btn.addEventListener('click', () => showOnMap(item.mac));
+  tdAct.appendChild(btn);
+  tr.appendChild(tdAct);
+
+  return tr;
+}
+
+/** Switch to map view with this MAC pre-filled and apply. */
+function showOnMap(mac) {
+  document.getElementById('filter-mac').value = mac;
+  saveFilters();
+  switchView('map');
+  applyMapView();
 }
 
 // ===== Marker rendering =====
@@ -311,6 +508,30 @@ function renderImportHistory(imports) {
     list.appendChild(li);
   });
 }
+
+// ===== Pagination event listeners =====
+
+document.getElementById('btn-first-page').addEventListener('click', () => {
+  if (tableState.page > 1) { tableState.page = 1; fetchTablePage(); }
+});
+
+document.getElementById('btn-prev-page').addEventListener('click', () => {
+  if (tableState.page > 1) { tableState.page--; fetchTablePage(); }
+});
+
+document.getElementById('btn-next-page').addEventListener('click', () => {
+  if (tableState.page < tableState.totalPages) { tableState.page++; fetchTablePage(); }
+});
+
+document.getElementById('btn-last-page').addEventListener('click', () => {
+  if (tableState.page < tableState.totalPages) { tableState.page = tableState.totalPages; fetchTablePage(); }
+});
+
+document.getElementById('page-size-select').addEventListener('change', e => {
+  tableState.pageSize = parseInt(e.target.value, 10);
+  tableState.page = 1;
+  fetchTablePage();
+});
 
 // ===== Initialise on page load =====
 

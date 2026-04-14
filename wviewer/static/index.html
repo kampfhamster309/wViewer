@@ -89,21 +89,60 @@
 
   </aside>
 
-  <!-- ===== Map ===== -->
-  <main id="map-container">
-    <div id="map"></div>
-    <div id="map-empty-msg" class="hidden">No networks match the current filters.</div>
-    <!-- Legend -->
-    <div id="map-legend">
-      <div class="legend-item">
-        <span class="legend-dot" style="background:#909090"></span>
-        Single location
-      </div>
-      <div class="legend-item">
-        <span class="legend-dot legend-multi"></span>
-        Multiple locations
+  <!-- ===== Main content area ===== -->
+  <main id="content-area">
+
+    <!-- Tab strip -->
+    <nav id="view-tabs">
+      <button class="tab-btn active" data-view="map">Map</button>
+      <button class="tab-btn" data-view="table">Table</button>
+    </nav>
+
+    <!-- Map view -->
+    <div id="map-view">
+      <div id="map"></div>
+      <div id="map-empty-msg" class="hidden">No networks match the current filters.</div>
+      <div id="map-legend">
+        <div class="legend-item">
+          <span class="legend-dot" style="background:#909090"></span>
+          Single location
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-multi"></span>
+          Multiple locations
+        </div>
       </div>
     </div>
+
+    <!-- Table view (populated in WVIEWER-19) -->
+    <div id="table-view" class="hidden">
+      <div id="table-toolbar">
+        <span id="table-count"></span>
+        <button id="btn-export-csv" class="btn-secondary">Export CSV</button>
+      </div>
+      <div id="table-scroll">
+        <table id="data-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div id="table-pagination">
+        <div id="pagination-info"></div>
+        <div id="pagination-controls">
+          <button id="btn-first-page" class="page-btn" title="First page">«</button>
+          <button id="btn-prev-page" class="page-btn" title="Previous page">‹</button>
+          <span id="page-indicator"></span>
+          <button id="btn-next-page" class="page-btn" title="Next page">›</button>
+          <button id="btn-last-page" class="page-btn" title="Last page">»</button>
+          <select id="page-size-select">
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="150">150 / page</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script src="/static/lib/leaflet/leaflet.js"></script>
