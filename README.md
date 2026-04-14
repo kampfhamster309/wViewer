@@ -29,6 +29,32 @@ uv run wviewer --port 9000     # use a different port
 uv run wviewer --no-browser    # don't open the browser automatically
 ```
 
+## Port configuration
+
+### Installed package (.deb)
+
+The default port is **8000**. To change it, edit `/etc/default/wviewer`:
+
+```sh
+sudo nano /etc/default/wviewer
+```
+
+Set your preferred port:
+
+```sh
+WVIEWER_PORT=9000
+```
+
+The change takes effect the next time you launch wViewer from the app launcher. The file is marked as a Debian conffile, so package upgrades will never overwrite your custom value.
+
+### Running from source
+
+Pass `--port` directly:
+
+```
+uv run wviewer --port 9000
+```
+
 ## Development
 
 ```bash
