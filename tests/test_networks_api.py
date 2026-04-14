@@ -1,4 +1,5 @@
 """Tests for GET /api/networks."""
+import re
 from pathlib import Path
 
 import pytest
@@ -6,7 +7,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from wviewer.app import app
+from wviewer.colors import SINGLE_LOCATION_COLOR, mac_to_color
 from wviewer.db import Base, get_session
+
+HEX_COLOR_RE = re.compile(r"^#[0-9a-f]{6}$")
 
 EXAMPLE_DIR = Path(__file__).parent.parent / "example"
 FILE_SMALL = EXAMPLE_DIR / "wigle-2026-04-09T114256.838416809+0000.csv"
@@ -236,3 +240,83 @@ async def test_limit_and_offset_together(populated_client: AsyncClient):
 async def test_invalid_limit_returns_422(populated_client: AsyncClient):
     response = await populated_client.get("/api/networks", params={"limit": 0})
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# marker_color (WVIEWER-7)
+# ---------------------------------------------------------------------------
+
+async def test_marker_color_present_on_all_features(populated_client: AsyncClient):
+    data = (await populated_client.get("/api/networks")).json()
+    for feature in data["features"]:
+        assert "marker_color" in feature["properties"]
+
+
+async def test_marker_color_is_valid_hex(populated_client: AsyncClient):
+    data = (await populated_client.get("/api/networks")).json()
+    for feature in data["features"]:
+        color = feature["properties"]["marker_color"]
+        assert HEX_COLOR_RE.match(color), f"Invalid color: {color}"
+
+
+async def test_single_location_mac_gets_grey(populated_client: AsyncClient):
+    # 08:02:8E:8F:AF:FF appears at only one location in the small file
+    data = (await populated_client.get(
+        "/api/networks", params={"mac": "08:02:8E:8F:AF:FF"}
+    )).json()
+    assert len(data["features"]) == 1
+    assert data["features"][0]["properties"]["marker_color"] == SINGLE_LOCATION_COLOR
+
+
+async def test_multi_location_mac_gets_hashed_color(populated_client: AsyncClient):
+    # DC:92:72:58:16:1E appears at two locations in the small file
+    mac = "DC:92:72:58:16:1E"
+    data = (await populated_client.get(
+        "/api/networks", params={"mac": mac}
+    )).json()
+    assert len(data["features"]) == 2
+    expected_color = mac_to_color(mac)
+    for feature in data["features"]:
+        assert feature["properties"]["marker_color"] == expected_color
+
+
+async def test_multi_location_color_differs_from_grey(populated_client: AsyncClient):
+    mac = "DC:92:72:58:16:1E"
+    data = (await populated_client.get(
+        "/api/networks", params={"mac": mac}
+    )).json()
+    for feature in data["features"]:
+        assert feature["properties"]["marker_color"] != SINGLE_LOCATION_COLOR
+
+
+async def test_multi_location_color_stable_across_requests(populated_client: AsyncClient):
+    mac = "DC:92:72:58:16:1E"
+    first = (await populated_client.get("/api/networks", params={"mac": mac})).json()
+    second = (await populated_client.get("/api/networks", params={"mac": mac})).json()
+    colors_first = {f["properties"]["marker_color"] for f in first["features"]}
+    colors_second = {f["properties"]["marker_color"] for f in second["features"]}
+    assert colors_first == colors_second
+
+
+async def test_multi_location_detection_uses_full_db(populated_client: AsyncClient):
+    """A MAC filtered to one feature should still get the multi-location color
+    if the other location exists elsewhere in the DB."""
+    mac = "DC:92:72:58:16:1E"
+    # Fetch only one of its locations via tight date filter
+    data = (await populated_client.get(
+        "/api/networks",
+        params={"mac": mac, "first_seen_to": "2026-04-09T11:16:30"},
+    )).json()
+    # We may get 1 or 2 features depending on exact timestamps — either way
+    # all must carry the hashed color since the MAC is multi-location in the DB
+    expected_color = mac_to_color(mac)
+    for feature in data["features"]:
+        assert feature["properties"]["marker_color"] == expected_color
+
+
+async def test_same_mac_same_color_across_features(populated_client: AsyncClient):
+    """All features for a given multi-location MAC must share the same color."""
+    mac = "DC:92:72:58:16:1E"
+    data = (await populated_client.get("/api/networks", params={"mac": mac})).json()
+    colors = {f["properties"]["marker_color"] for f in data["features"]}
+    assert len(colors) == 1

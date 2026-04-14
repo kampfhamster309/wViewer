@@ -4,9 +4,10 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from wviewer.colors import SINGLE_LOCATION_COLOR, assign_colors, mac_to_color
 from wviewer.db import get_session
 from wviewer.models import Network
 
@@ -15,8 +16,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/networks", tags=["networks"])
 
 
-def _build_geojson(networks: list[Network]) -> dict[str, Any]:
-    """Wrap a list of Network ORM rows as a GeoJSON FeatureCollection."""
+async def _get_multi_location_macs(
+    session: AsyncSession, macs: set[str]
+) -> set[str]:
+    """Return the subset of macs that appear at more than one distinct (lat, lon) in the DB."""
+    if not macs:
+        return set()
+
+    stmt = (
+        select(Network.mac)
+        .where(Network.mac.in_(macs))
+        .group_by(Network.mac)
+        .having(
+            func.count(
+                func.distinct(
+                    func.printf("%s,%s", Network.latitude, Network.longitude)
+                )
+            ) > 1
+        )
+    )
+    result = await session.execute(stmt)
+    return {row[0] for row in result.fetchall()}
+
+
+def _build_geojson(
+    networks: list[Network], multi_location_macs: set[str]
+) -> dict[str, Any]:
+    """Wrap a list of Network ORM rows as a GeoJSON FeatureCollection.
+
+    Each feature's properties include a `marker_color` hex value:
+    - Multi-location MACs: a stable per-MAC color derived from hashing the MAC.
+    - Single-location MACs: neutral grey.
+    """
+    color_map = assign_colors([net.mac for net in networks], multi_location_macs)
+
     features = []
     for net in networks:
         features.append(
@@ -44,6 +77,7 @@ def _build_geojson(networks: list[Network]) -> dict[str, Any]:
                     "rcois": net.rcois,
                     "mfgr_id": net.mfgr_id,
                     "type": net.type,
+                    "marker_color": color_map[net.mac],
                 },
             }
         )
@@ -83,4 +117,7 @@ async def list_networks(
     result = await session.execute(stmt)
     networks = result.scalars().all()
 
-    return _build_geojson(networks)
+    unique_macs = {net.mac for net in networks}
+    multi_location_macs = await _get_multi_location_macs(session, unique_macs)
+
+    return _build_geojson(networks, multi_location_macs)
