@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -28,7 +29,12 @@ async def _lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="wViewer", version="0.1.0", lifespan=_lifespan)
+try:
+    _version = version("wviewer")
+except PackageNotFoundError:
+    _version = "0.0.0"  # fallback when running outside an installed package
+
+app = FastAPI(title="wViewer", version=_version, lifespan=_lifespan)
 
 
 @app.exception_handler(Exception)
