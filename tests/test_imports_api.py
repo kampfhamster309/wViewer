@@ -176,3 +176,30 @@ async def test_upload_missing_filename_returns_error(client: AsyncClient):
         files={"file": ("", io.BytesIO(b"data"), "text/csv")},
     )
     assert response.status_code == 422
+
+
+async def test_upload_non_csv_extension_returns_400(client: AsyncClient):
+    """Files with a non-.csv extension are rejected before any parsing."""
+    response = await client.post(
+        "/api/imports",
+        files={"file": ("export.txt", io.BytesIO(b"some,data\n"), "text/plain")},
+    )
+    assert response.status_code == 400
+    assert "csv" in response.json()["detail"].lower()
+
+
+async def test_upload_json_extension_returns_400(client: AsyncClient):
+    response = await client.post(
+        "/api/imports",
+        files={"file": ("data.json", io.BytesIO(b'{"key": "val"}'), "application/json")},
+    )
+    assert response.status_code == 400
+
+
+async def test_error_response_has_detail_key(client: AsyncClient):
+    """All error responses must carry a 'detail' key for consistent frontend handling."""
+    response = await client.post(
+        "/api/imports",
+        files={"file": ("export.txt", io.BytesIO(b"x"), "text/plain")},
+    )
+    assert "detail" in response.json()

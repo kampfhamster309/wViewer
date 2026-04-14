@@ -12,6 +12,9 @@ function switchView(view) {
   if (view === currentView) return;
   currentView = view;
 
+  // Clear stale status from the previous view
+  setFilterStatus('', '');
+
   // Update tab buttons
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === view);
@@ -202,7 +205,7 @@ async function applyMapView() {
     const count = geojson.features.length;
     setFilterStatus(`${count} network${count !== 1 ? 's' : ''} found.`, 'ok');
   } catch (err) {
-    setFilterStatus(`Error: ${err.message}`, 'err');
+    setFilterStatus(`Error: ${userErrorMessage(err)}`, 'err');
   }
 }
 
@@ -228,7 +231,7 @@ async function fetchTablePage() {
     const t = data.total;
     setFilterStatus(`${t} network${t !== 1 ? 's' : ''} found.`, 'ok');
   } catch (err) {
-    setFilterStatus(`Error: ${err.message}`, 'err');
+    setFilterStatus(`Error: ${userErrorMessage(err)}`, 'err');
   }
 }
 
@@ -404,7 +407,7 @@ async function exportCsv() {
     const filename = `wviewer-export-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadBlob(csv, 'text/csv;charset=utf-8;', filename);
   } catch (err) {
-    setFilterStatus(`Export failed: ${err.message}`, 'err');
+    setFilterStatus(`Export failed: ${userErrorMessage(err)}`, 'err');
   } finally {
     btn.disabled  = false;
     btn.textContent = origText;
@@ -527,6 +530,15 @@ function setImportStatus(html, type) {
   el.className = type ? `status-${type}` : '';
 }
 
+/**
+ * Convert a caught error into a short user-facing message.
+ * TypeError typically means the fetch itself failed (server unreachable).
+ */
+function userErrorMessage(err) {
+  if (err instanceof TypeError) return 'Network error — is the server reachable?';
+  return err.message;
+}
+
 // ===== Import section =====
 
 const fileInput  = document.getElementById('file-input');
@@ -581,10 +593,15 @@ btnImport.addEventListener('click', async () => {
 async function loadImportHistory() {
   try {
     const res = await fetch('/api/imports');
-    if (!res.ok) return;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const imports = await res.json();
     renderImportHistory(imports);
-  } catch (_) { /* silently ignore — history is non-critical */ }
+  } catch (err) {
+    const list = document.getElementById('import-history-list');
+    list.innerHTML = `<li class="history-empty" style="color:#e94560">
+      Could not load history: ${escHtml(userErrorMessage(err))}
+    </li>`;
+  }
 }
 
 function renderImportHistory(imports) {

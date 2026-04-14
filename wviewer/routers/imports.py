@@ -43,6 +43,9 @@ async def create_import(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
 
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are accepted.")
+
     # Read and decode the uploaded file
     raw = await file.read()
     try:
@@ -51,7 +54,13 @@ async def create_import(
         raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
 
     # Parse CSV
-    parse_result = parse_wigle_csv(io.StringIO(text), file.filename)
+    try:
+        parse_result = parse_wigle_csv(io.StringIO(text), file.filename)
+    except Exception as exc:
+        logger.exception("Unexpected error parsing '%s'", file.filename)
+        raise HTTPException(
+            status_code=422, detail=f"Could not parse file: {exc}"
+        ) from exc
 
     if not parse_result.records and parse_result.rows_skipped == 0:
         # File had no data rows at all — still record the import
