@@ -120,6 +120,7 @@ async function applyFilters() {
   if (type) params.set('type', type);
   if (from) params.set('first_seen_from', from);
   if (to)   params.set('first_seen_to', to);
+  params.set('limit', '100000');
 
   saveFilters();
   setFilterStatus('<span class="spinner"></span>Loading…', 'info');

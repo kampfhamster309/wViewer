@@ -92,7 +92,7 @@ async def list_networks(
     type: str | None = Query(default=None, description="Exact match on network type (WIFI, BT, BLE, GSM)"),
     first_seen_from: datetime | None = Query(default=None, description="Filter FirstSeen >= this ISO datetime"),
     first_seen_to: datetime | None = Query(default=None, description="Filter FirstSeen <= this ISO datetime"),
-    limit: int = Query(default=1000, ge=1, le=10000, description="Max number of results"),
+    limit: int = Query(default=100000, ge=1, le=100000, description="Max number of results"),
     offset: int = Query(default=0, ge=0, description="Number of results to skip"),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:

@@ -242,6 +242,11 @@ async def test_invalid_limit_returns_422(populated_client: AsyncClient):
     assert response.status_code == 422
 
 
+async def test_limit_above_max_returns_422(populated_client: AsyncClient):
+    response = await populated_client.get("/api/networks", params={"limit": 100001})
+    assert response.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # marker_color (WVIEWER-7)
 # ---------------------------------------------------------------------------
