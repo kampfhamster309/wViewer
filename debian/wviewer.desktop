@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=wViewer
+Comment=WiGLE WiFi wardriving CSV viewer
+Exec=/usr/bin/wviewer
+Icon=network-wireless
+Categories=Network;Utility;
+Terminal=false
+StartupNotify=false
