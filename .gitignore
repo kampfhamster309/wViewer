@@ -1,0 +1,55 @@
+# Project-specific
+example/
+AGENTS.md
+cache.md
+CLAUDE.md
+development_plan.md
+rough_plan.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# uv / virtualenv
+.venv/
+.uv/
+
+# Distribution / packaging
+*.deb
+*.tar.gz
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
