@@ -1,9 +1,12 @@
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from wviewer.routers import imports, networks
+
+_STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="wViewer", version="0.1.0")
 
@@ -12,7 +15,7 @@ app.include_router(networks.router)
 
 app.mount(
     "/static",
-    StaticFiles(directory=Path(__file__).parent / "static"),
+    StaticFiles(directory=_STATIC_DIR),
     name="static",
 )
 
@@ -20,3 +23,8 @@ app.mount(
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/")
+async def index() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")

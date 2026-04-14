@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>wViewer</title>
+  <link rel="stylesheet" href="/static/lib/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/static/lib/markercluster/MarkerCluster.css" />
+  <link rel="stylesheet" href="/static/lib/markercluster/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ===== Sidebar ===== -->
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <h1>wViewer</h1>
+    </div>
+
+    <!-- Filter section -->
+    <section class="sidebar-section" id="filter-section">
+      <h2>Filter</h2>
+
+      <div class="field-group">
+        <label for="filter-mac">MAC</label>
+        <input type="text" id="filter-mac" placeholder="e.g. DC:92" autocomplete="off" />
+      </div>
+
+      <div class="field-group">
+        <label for="filter-ssid">SSID</label>
+        <input type="text" id="filter-ssid" placeholder="e.g. MyNetwork" autocomplete="off" />
+      </div>
+
+      <div class="field-group">
+        <label for="filter-auth">Auth Mode</label>
+        <input type="text" id="filter-auth" placeholder="e.g. WPA3" autocomplete="off" />
+      </div>
+
+      <div class="field-group">
+        <label for="filter-type">Type</label>
+        <select id="filter-type">
+          <option value="">All</option>
+          <option value="WIFI">WIFI</option>
+          <option value="BT">BT</option>
+          <option value="BLE">BLE</option>
+          <option value="GSM">GSM</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>First Seen</label>
+        <div id="relative-presets">
+          <button class="preset-btn" data-hours="24">24h</button>
+          <button class="preset-btn" data-hours="168">7d</button>
+          <button class="preset-btn" data-hours="720">30d</button>
+          <button class="preset-btn preset-clear" data-hours="">All</button>
+        </div>
+        <div class="date-range">
+          <input type="datetime-local" id="filter-from" title="First Seen from" />
+          <span class="date-sep">–</span>
+          <input type="datetime-local" id="filter-to" title="First Seen to" />
+        </div>
+      </div>
+
+      <button id="btn-apply" class="btn-primary">Apply</button>
+      <div id="filter-status"></div>
+    </section>
+
+    <!-- Import section -->
+    <section class="sidebar-section" id="import-section">
+      <h2>Import</h2>
+      <div id="import-drop-zone">
+        <label for="file-input" id="file-label">
+          <span id="file-label-text">Choose CSV file…</span>
+        </label>
+        <input type="file" id="file-input" accept=".csv" />
+      </div>
+      <button id="btn-import" class="btn-primary" disabled>Import</button>
+      <div id="import-status"></div>
+    </section>
+
+    <!-- Import history -->
+    <section class="sidebar-section" id="history-section">
+      <h2>Import History</h2>
+      <ul id="import-history-list">
+        <li class="history-empty">No imports yet.</li>
+      </ul>
+    </section>
+
+  </aside>
+
+  <!-- ===== Map ===== -->
+  <main id="map-container">
+    <div id="map"></div>
+    <div id="map-empty-msg" class="hidden">No networks match the current filters.</div>
+    <!-- Legend -->
+    <div id="map-legend">
+      <div class="legend-item">
+        <span class="legend-dot" style="background:#909090"></span>
+        Single location
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot legend-multi"></span>
+        Multiple locations
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/lib/leaflet/leaflet.js"></script>
+  <script src="/static/lib/markercluster/leaflet.markercluster.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
