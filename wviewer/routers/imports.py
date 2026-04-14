@@ -1,11 +1,12 @@
-"""Import API — POST /api/imports."""
+"""Import API — POST /api/imports, GET /api/imports, DELETE /api/imports/{id}."""
 import codecs
+import io
 import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,15 @@ class ImportResponse(BaseModel):
     import_id: int
     rows_imported: int
     rows_skipped: int
+
+
+class ImportRecord(BaseModel):
+    id: int
+    recon_date: datetime | None
+    imported_at: datetime
+    row_count: int
+
+    model_config = {"from_attributes": True}
 
 
 @router.post("", response_model=ImportResponse, status_code=201)
@@ -41,7 +51,6 @@ async def create_import(
         raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
 
     # Parse CSV
-    import io
     parse_result = parse_wigle_csv(io.StringIO(text), file.filename)
 
     if not parse_result.records and parse_result.rows_skipped == 0:
@@ -100,3 +109,32 @@ async def create_import(
         rows_imported=rows_imported,
         rows_skipped=rows_skipped,
     )
+
+
+@router.get("", response_model=list[ImportRecord])
+async def list_imports(
+    session: AsyncSession = Depends(get_session),
+) -> list[ImportRecord]:
+    """Return all import records ordered by imported_at descending."""
+    result = await session.execute(
+        select(Import).order_by(Import.imported_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.delete("/{import_id}", status_code=204)
+async def delete_import(
+    import_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Delete an import record.
+
+    Network rows are NOT deleted — they are deduplicated across imports
+    and do not belong exclusively to a single import batch.
+    """
+    result = await session.execute(select(Import).where(Import.id == import_id))
+    imp = result.scalar_one_or_none()
+    if imp is None:
+        raise HTTPException(status_code=404, detail=f"Import {import_id} not found.")
+    await session.delete(imp)
+    await session.commit()
