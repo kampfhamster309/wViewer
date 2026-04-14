@@ -368,6 +368,85 @@ function showOnMap(mac) {
   applyMapView();
 }
 
+// ===== CSV export =====
+
+document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
+
+async function exportCsv() {
+  const btn = document.getElementById('btn-export-csv');
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Exporting…';
+
+  try {
+    // Fetch all pages at max allowed page_size, preserving current sort
+    const allItems = [];
+    let page = 1;
+    let total = null;
+
+    do {
+      const params = buildFilterParams();
+      params.set('page', page);
+      params.set('page_size', '150');
+      params.set('sort_by', tableState.sortBy);
+      params.set('sort_dir', tableState.sortDir);
+
+      const res = await fetch(`/api/networks/table?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (total === null) total = data.total;
+      allItems.push(...data.items);
+      page++;
+    } while (allItems.length < total);
+
+    const csv      = itemsToCsv(allItems);
+    const filename = `wviewer-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadBlob(csv, 'text/csv;charset=utf-8;', filename);
+  } catch (err) {
+    setFilterStatus(`Export failed: ${err.message}`, 'err');
+  } finally {
+    btn.disabled  = false;
+    btn.textContent = origText;
+  }
+}
+
+/** Convert an array of network item objects to a CSV string. */
+function itemsToCsv(items) {
+  const header = TABLE_COLUMNS.map(c => csvCell(c.label)).join(',');
+  const rows   = items.map(item =>
+    TABLE_COLUMNS.map(col => {
+      const val = item[col.key];
+      if (val == null) return '';
+      if (col.key === 'first_seen') {
+        return csvCell(String(val).replace('T', ' ').replace(/\.\d+$/, ''));
+      }
+      return csvCell(String(val));
+    }).join(',')
+  );
+  return [header, ...rows].join('\n');
+}
+
+/** Wrap a cell value in quotes if it contains a comma, quote, or newline. */
+function csvCell(val) {
+  if (/[",\n\r]/.test(val)) return '"' + val.replace(/"/g, '""') + '"';
+  return val;
+}
+
+/** Trigger a browser download for the given text content. */
+function downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ===== Marker rendering =====
 
 function renderMarkers(geojson) {
