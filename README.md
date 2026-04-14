@@ -45,3 +45,14 @@ uv run pytest
 2. Use the filter controls to narrow down results by MAC, SSID, AuthMode, or date
 3. Press **Apply** to render matching networks on the map
 4. Click any marker for full record details
+
+Switch to the **Table** tab to browse results in a paginated table:
+
+- Click any column header to sort ascending; click again to sort descending
+- Use the page-size selector (50 / 100 / 150 rows) and prev/next controls to paginate
+- Press **Export CSV** to download the full filtered result set as a CSV file
+- Press **Map** on any row to jump to that network on the map view
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).
